@@ -1,0 +1,43 @@
+node {
+    
+    def mavenHome = tool name: "maven-3.8.4"
+    def buildNumber = BUILD_NUMBER
+   
+    stage('CheckOutCode') {
+        
+        git credentialsId: 'b51d4c1e-fb05-45dc-bee3-c43d848369a2', url: 'https://github.com/MithunTechnologiesDevOps/maven-web-application.git'
+        
+    }
+
+    stage('Build') {
+        
+        sh "${mavenHome}/bin/mvn clean package"
+        
+    }
+    
+    stage('Build Docker Image') {
+        
+      sh "docker build -t ms700927/maven-web-app:${buildNumber} . "     
+    
+    }
+    
+    stage('Docker Login and Push Image') {
+        
+        withCredentials([string(credentialsId: 'dockerHub', variable: 'dockerHub')]) {
+             sh "docker login -u ms700927 -p ${dockerHub} "
+        }
+        sh "docker push ms700927/maven-web-app:${buildNumber}"
+        
+    }
+        
+    stage('Deploy Application AS A Docker Container In Docker Deployment Server') {
+        
+        sshagent(['Docker_Dev_Server_SSH']) {
+    
+        sh "ssh -o StrictHostKeyChecking=true ubuntu@172.31.85.236 docker rm -f javaWebAppContainer || true "
+        
+        sh "ssh -o StrictHostKeyChecking=true ubuntu@172.31.85.236 docker run -d -p 8080:8080 --name javaWebAppContainer ms700927/maven-web-app:${buildNumber} "
+            
+        }
+    }
+}
